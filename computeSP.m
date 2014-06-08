@@ -17,8 +17,7 @@ if (rteMat(i,j) == i)
 else
     k = rteMat(i,j);
     sp1 = computeSP(rteMat, i, k);
-    sp2 = computeSP(rteMat, k, j);
-    sp = [sp1, sp2(2:length(sp2))]; % Avoid counting k twice!
+    sp = [sp1, j];
     return;
 end
 end
