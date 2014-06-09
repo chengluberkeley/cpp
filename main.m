@@ -102,16 +102,16 @@ N_TARGET_EDGE = 100; % The number of target edges to protect.
 %% Initialize the global variables to record the final success rates
 % Here we don't have the "capacity". We only compute the shortest total distance (and the maximum single truck distance) to cover a specific set of target edges 
 % Total distances
-aveTotalDistPK = zeros(length(V_AVAILABLE)); 
-aveTotalDistNN = zeros(length(V_AVAILABLE));
+aveTotalDistPK = zeros(length(V_AVAILABLE),1); 
+aveTotalDistNN = zeros(length(V_AVAILABLE),1);
 
 % For standard deviation computing
 sdTotalDistPK = zeros(length(V_AVAILABLE), N_RUN);
 sdTotalDistNN = zeros(length(V_AVAILABLE), N_RUN);
 
 % Maximum single truck distance
-aveMaxDistPK = zeros(length(V_AVAILABLE));
-aveMaxDistNN = zeros(length(V_AVAILABLE));
+aveMaxDistPK = zeros(length(V_AVAILABLE),1);
+aveMaxDistNN = zeros(length(V_AVAILABLE),1);
 
 % For standard deviation computing
 sdMaxDistPK = zeros(length(V_AVAILABLE), N_RUN);
