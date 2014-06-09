@@ -25,23 +25,19 @@ function [totalDist, maxDist, spMat, spRteMat, hasDoneSp] = PK(distMat, edgeTarg
 BIGNUM = inf;
 m = size(edges,1); % Number of edges
 
-singleRoute = zeros(1, m*5);  % Store the single route for splitting
+singleRoute = zeros(1, m*10);  % Store the single route for splitting: we extend the route in two directions
 initEdgeTargetList = edgeTargetList;
 numEdgeTarget = size(edgeTargetList,1);
 % Randomly choose an target edge to start with
 index = randi(numEdgeTarget);
-dir = randi(2);
-if (dir == 1)
-    singleRoute(1) = edgeTargetList(index,1);
-    singleRoute(2) = edgeTargetList(index,2);
-    startNode = edgeTargetList(index,2);
-else
-    singleRoute(1) = edgeTargetList(index,2);
-    singleRoute(2) = edgeTargetList(index,1);
-    startNode = edgeTargetList(index,1);
-end
-routeMark = 2; % Mark the index in singleRoute
-totalSingleRteDist = distMat(singleRoute(1), singleRoute(2));  % The total distance of the single route
+leftMark = m*5;
+rightMark = leftMark + 1;
+singleRoute(leftMark) = edgeTargetList(index,1);
+singleRoute(rightMark) = edgeTargetList(index,2);
+leftNode = edgeTargetList(index,1);
+rightNode = edgeTargetList(index,2);
+%routeMark = 2; % Mark the index in singleRoute
+totalSingleRteDist = distMat(singleRoute(leftMark), singleRoute(rightMark));  % The total distance of the single route
 
 % Remove the first covered target edge
 edgeTargetList(index,:) = [];
@@ -49,30 +45,79 @@ numEdgeTarget = numEdgeTarget - 1;
 
 % Check the rest uncovered target edges
 while (numEdgeTarget > 0)
-    if (0 == hasDoneSp(startNode))
-        [spMat, spRteMat] = BellmanFord(spMat, spRteMat, distMat, startNode, edges);
-        hasDoneSp(startNode) = 1;
+    if (0 == hasDoneSp(leftNode))
+        [spMat, spRteMat] = BellmanFord(spMat, spRteMat, distMat, leftNode, edges);
+        hasDoneSp(leftNode) = 1;
+    end
+    
+    if (0 ==  hasDoneSp(rightNode))
+        [spMat, spRteMat] = BellmanFord(spMat, spRteMat, distMat, rightNode, edges);
+        hasDoneSp(rightNode) = 1;        
     end
     
     % Choose the next closest uncovered target edge
-    tempSp = zeros(numEdgeTarget, 2);
-    tempSp(:, 1) = spMat(startNode, edgeTargetList(:,1))';
-    tempSp(:, 2) = spMat(startNode, edgeTargetList(:,2))';
+    tempSp = zeros(numEdgeTarget, 4);
+    tempSp(:, 1) = spMat(leftNode, edgeTargetList(:,1))';
+    tempSp(:, 2) = spMat(leftNode, edgeTargetList(:,2))';
+    tempSp(:, 3) = spMat(rightNode, edgeTargetList(:,1))';
+    tempSp(:, 4) = spMat(rightNode, edgeTargetList(:,2))';
     [tempSp, nodeIndex] = min(tempSp, [], 2);
     [tempSp, edgeIndex] = min(tempSp); % edgeIndex: next target edge to cover
-    nextNode = edgeTargetList(edgeIndex, nodeIndex(edgeIndex)); % The first node reached of the next target edge
-    spRte = computeSP(spRteMat, startNode, nextNode); % Compute the shortest path from startNode to nextNode
+    switch nodeIndex(edgeIndex)
+        case 1
+            beforeNode = edgeTargetList(edgeIndex, 1);
+            spRte = computeSP(spRteMat, leftNode, beforeNode);
+            % Update the single route
+            rteLength = length(spRte)-1;
+            singleRoute(1, leftMark-rteLength:leftMark) = flip(spRte);
+            leftMark = leftMark - rteLength - 1;
+            singleRoute(1, leftMark) = edgeTargetList(edgeIndex, 2);
+            leftNode = singleRoute(1, leftMark);
+            totalSingleRteDist = totalSingleRteDist + tempSp + distMat(edgeTargetList(edgeIndex,1), edgeTargetList(edgeIndex,2));
+        case 2
+            beforeNode = edgeTargetList(edgeIndex, 2);
+            spRte = computeSP(spRteMat, leftNode, beforeNode);
+            % Update the single route
+            rteLength = length(spRte)-1;
+            singleRoute(1, leftMark-rteLength:leftMark) = flip(spRte);
+            leftMark = leftMark - rteLength - 1;
+            singleRoute(1, leftMark) = edgeTargetList(edgeIndex, 1);
+            leftNode = singleRoute(1, leftMark);
+            totalSingleRteDist = totalSingleRteDist + tempSp + distMat(edgeTargetList(edgeIndex,1), edgeTargetList(edgeIndex,2));            
+        case 3
+            afterNode = edgeTargetList(edgeIndex, 1);
+            spRte = computeSP(spRteMat, rightNode, afterNode);
+            % Update the single route
+            rteLength = length(spRte)-1;
+            singleRoute(1, rightMark:rightMark+rteLength) = spRte;
+            rightMark = rightMark + rteLength + 1;
+            singleRoute(1, rightMark) = edgeTargetList(edgeIndex, 2);
+            rightNode = singleRoute(1, rightMark);
+            totalSingleRteDist = totalSingleRteDist + tempSp + distMat(edgeTargetList(edgeIndex,1), edgeTargetList(edgeIndex,2));
+        case 4
+            afterNode = edgeTargetList(edgeIndex, 2);
+            spRte = computeSP(spRteMat, rightNode, afterNode);
+            % Update the single route
+            rteLength = length(spRte)-1;
+            singleRoute(1, rightMark:rightMark+rteLength) = spRte;
+            rightMark = rightMark + rteLength + 1;
+            singleRoute(1, rightMark) = edgeTargetList(edgeIndex, 1);
+            rightNode = singleRoute(1, rightMark);
+            totalSingleRteDist = totalSingleRteDist + tempSp + distMat(edgeTargetList(edgeIndex,1), edgeTargetList(edgeIndex,2));
+    end
+    %nextNode = edgeTargetList(edgeIndex, nodeIndex(edgeIndex)); % The first node reached of the next target edge
+    %spRte = computeSP(spRteMat, startNode, nextNode); % Compute the shortest path from startNode to nextNode
     % Update the single route
-    rteLength = length(spRte)-1;
-    singleRoute(1, routeMark:routeMark + rteLength) = spRte;
-    routeMark = routeMark + rteLength;
-    totalSingleRteDist = totalSingleRteDist + tempSp;
+    %rteLength = length(spRte)-1;
+    %singleRoute(1, routeMark:routeMark + rteLength) = spRte;
+    %routeMark = routeMark + rteLength;
+    %totalSingleRteDist = totalSingleRteDist + tempSp;
     
-    singleRoute(routeMark+1) = edgeTargetList(edgeIndex, 3 - nodeIndex(edgeIndex));  % Get the second node reached of this next target edge
-    routeMark = routeMark + 1;
-    totalSingleRteDist = totalSingleRteDist + distMat(singleRoute(routeMark-1), singleRoute(routeMark));
+    %singleRoute(routeMark+1) = edgeTargetList(edgeIndex, 3 - nodeIndex(edgeIndex));  % Get the second node reached of this next target edge
+    %routeMark = routeMark + 1;
+    %totalSingleRteDist = totalSingleRteDist + distMat(singleRoute(routeMark-1), singleRoute(routeMark));
     
-    startNode = singleRoute(routeMark);
+    %startNode = singleRoute(routeMark);
     % Remove the covered target edge
     edgeTargetList(edgeIndex, :) = [];
     numEdgeTarget = numEdgeTarget - 1;    
@@ -80,25 +125,25 @@ end
 
 % Compute each partition separately
 appxPartLength = totalSingleRteDist/k;
-routeIndex = 1;
+routeIndex = leftMark;
 partRoute = zeros(k, 3); % dim 1: total length; dim 2: left starting point; dim 3: right starting point
 for i = 1:(k-1)
     % Find the first edge that is a target edge
-    while ((routeIndex < routeMark) && (ismember([singleRoute(routeIndex), singleRoute(routeIndex+1)], initEdgeTargetList, 'rows') == 0) && (ismember([singleRoute(routeIndex+1), singleRoute(routeIndex)], initEdgeTargetList, 'rows') == 0))
+    while ((routeIndex < rightMark) && (ismember([singleRoute(routeIndex), singleRoute(routeIndex+1)], initEdgeTargetList, 'rows') == 0) && (ismember([singleRoute(routeIndex+1), singleRoute(routeIndex)], initEdgeTargetList, 'rows') == 0))
         routeIndex = routeIndex + 1;
     end
     
-    if (routeIndex == routeMark)
+    if (routeIndex == rightMark)
         break;
     end
     
     partRoute(i,2) = singleRoute(routeIndex);
-    while ((routeIndex < routeMark) && (partRoute(i,1) + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1)) < appxPartLength))
+    while ((routeIndex < rightMark) && (partRoute(i,1) + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1)) < appxPartLength))
         partRoute(i,1) = partRoute(i,1) + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
         routeIndex = routeIndex + 1;
     end
     
-    if (routeIndex < routeMark)
+    if (routeIndex < rightMark)
         partRoute(i,1) = partRoute(i,1) + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
         routeIndex = routeIndex + 1;       
     end
@@ -106,11 +151,11 @@ for i = 1:(k-1)
 end
 
 % The last partition finishes all the rest single route
-while ((routeIndex < routeMark) && (ismember([singleRoute(routeIndex), singleRoute(routeIndex+1)], initEdgeTargetList, 'rows') == 0) && (ismember([singleRoute(routeIndex+1), singleRoute(routeIndex)], initEdgeTargetList, 'rows') == 0))
+while ((routeIndex < rightMark) && (ismember([singleRoute(routeIndex), singleRoute(routeIndex+1)], initEdgeTargetList, 'rows') == 0) && (ismember([singleRoute(routeIndex+1), singleRoute(routeIndex)], initEdgeTargetList, 'rows') == 0))
     routeIndex = routeIndex + 1;
 end
 partRoute(k,2) = singleRoute(routeIndex);
-while (routeIndex < routeMark) 
+while (routeIndex < rightMark) 
     partRoute(k,1) = partRoute(k,1) + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
     routeIndex = routeIndex + 1;
 end
