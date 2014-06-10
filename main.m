@@ -41,7 +41,7 @@ PM_SWITCH = 1; % Switch to determine which minimum cost perfect matching subrout
 % Switch to do initial checking for the nearest neighbor algorithm
 %NN_SWITCH = false;
 
-%% Initializatioin
+%% Initialization
 m = size(edges, 1); % Number of edges
 n = size(nodes, 1); % Number of nodes.
 %prob = edgeProbs; % (INPUT) Probabilities over edges. This is computed by solving the Stackelberg game (Need to prepare the data specifically.)
