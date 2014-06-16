@@ -92,13 +92,12 @@ hasDoneSp = zeros(n,1); % Record whether we have computed the shortest paths fro
 
 % Scenario constants, subject to change. Note: now we only consider trucks!
 DAYS = 100; % Total days to consider. Assume one attack per day
-V_AVAILABLE = [3,7,11,15,30]; % This is the number of available vehicles each day;
-
+V_AVAILABLE = [3,7,11,15]; % This is the number of available vehicles each day;
 %V_CAPACITY = [4000, 4250, 4500];  % Every day's capacity of each truck. Note that now every truck does not need to return to its respective starting point
 % DEPOT_ID = 28; % Depot ID % No depot. Instead, let's assume that every
 % day the k trucks will start at an edge uniformly!
 N_RUN = 10; % Number of runs for the same configuration.
-N_TARGET_EDGE = 20; % The number of target edges to protect.
+N_TARGET_EDGE = 100; % The number of target edges to protect.
 
 %% Initialize the global variables to record the final success rates
 % Here we don't have the "capacity". We only compute the shortest total distance (and the maximum single truck distance) to cover a specific set of target edges 
