@@ -1,8 +1,7 @@
-function [totalDist, maxDist, spMat, spRteMat, hasDoneSp] = nearestNeighbors(distMat, edgeTargetList, spMat, spRteMat, hasDoneSp, k, truckLoc, edges)
+function [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = capNearestNeighbors(distMat, edgeTargetList, spMat, spRteMat, hasDoneSp, k, cap, truckLoc, edges)
 % nearestNeighbors: implement a naive algorithm based on nearest neighbors
-% to solve the total distance to cover the edgeTargetList with the k trucks
-% (truckLoc initial location) and the maximum travel distance among the k
-% trucks
+% to solve the maximum number of target edges to cover of the edgeTargetList with the k trucks
+% (truckLoc initial location), each with capacity cap.
 
 %% Input argument
 % distMat: distance matrix of the network
@@ -12,13 +11,12 @@ function [totalDist, maxDist, spMat, spRteMat, hasDoneSp] = nearestNeighbors(dis
 % hasDoneSp: record whehter a source j has been computed for all
 % single-source shortest paths
 % k: number of available vehicles
+% cap: capacity of each vehicle
 % truckLoc: the (current) location of the k trucks. 
 % edges: the complete set of edges used for computing the shortest paths
 
 %% Output
-% totalDist: the total travel distance to cover all the target edges with
-% the k trucks
-% maxDist: the maximum travel distance among the k trucks
+% leftEdgeTargetList: the left uncovered target edges
 % spMat, spRteMat, hasDoneSp: to keep update all the shortest path
 % information
 
@@ -30,7 +28,7 @@ numEdgeTarget = size(edgeTargetList, 1);
 %% Main algorithm
 %% This is the new method: we consider all the target edges aggregatedly ----------------------------------------
 %% Initialization step: initialize the closes target edges to cover for every truck
-currDist = zeros(k,1); % Record the total distance traveled by each truck 
+currDist = zeros(k,1); % Record the total distance traveled by each truck: make sure that they all do not exceed the capacities
 currNextDist = zeros(k,1); % Next distance to travel to cover the closest target edge
 currSpEdge = zeros(k,1); % Next closest target edge to cover for each truck
 currSpNextNode = truckLoc; % Next starting node of each truck if it were to cover its closes target edge
@@ -60,7 +58,6 @@ for j = 1:k
     end        
 end
 
-
 while (numEdgeTarget > 0)
 %         % Vectorization implementation!
 %         tempSp = zeros(numEdgeTarget, 2);
@@ -76,10 +73,14 @@ while (numEdgeTarget > 0)
 %         currNNSp(j) = tempSp;
 %         currNNIndex(j,1) = edgeIndex;
 %         currNNIndex(j,2) = 3 - nodeIndex; % We count the ending node!
+
     tempDist = currDist + currNextDist;
-    [~, truckIndex] = min(tempDist); % Choose the one that has the currently minimum travel distance
+    [tempDist, truckIndex] = min(tempDist); % Choose the one that has the currently minimum travel distance
+    if (tempDist > cap)
+        break;
+    end
     % Update for the truck (truckIndex)
-    currDist(truckIndex) = tempDist(truckIndex);
+    currDist(truckIndex) = tempDist;
     truckLoc(truckIndex) = currSpNextNode(truckIndex);
     coveredEdge = currSpEdge(truckIndex);
     % Update the closest uncovered target edge for the k trucks (we only update the ones which are needed)
@@ -118,8 +119,9 @@ while (numEdgeTarget > 0)
     end   
 end
 
-totalDist = sum(currDist);
-maxDist = max(currDist);
+leftEdgeTargetList = edgeTargetList;
+%totalDist = sum(currDist);
+%maxDist = max(currDist);
 %% This is an old method: we consider each truck separately. But a better way be to consider all the target edges aggregatedly -------------------------------------------
 % Check whether we can break it into k parts, each within the capacity lambda
 % The algorithm is a nearest neighbor algorithm
