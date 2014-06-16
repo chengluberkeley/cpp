@@ -138,16 +138,60 @@ for i = 1:(k-1)
     end
     
     partRoute(i,2) = singleRoute(routeIndex);
-    while ((routeIndex < rightMark) && (partRoute(i,1) + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1)) < appxPartLength))
-        partRoute(i,1) = partRoute(i,1) + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
-        routeIndex = routeIndex + 1;
+    partialDistSum = 0;
+    while ((routeIndex < rightMark) && (partRoute(i,1) + partialDistSum + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1)) < appxPartLength))
+        [Lia, Locb] = ismember([singleRoute(routeIndex), singleRoute(routeIndex+1)], initEdgeTargetList, 'rows');
+        if (1 == Lia)  % Reach a new uncovered edge!
+            partialDistSum = partialDistSum + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
+            partRoute(i,1) = partRoute(i,1) + partialDistSum;
+            partialDistSum = 0; % Restart for the next "meaningful" segment
+            routeIndex = routeIndex + 1;
+            partRoute(i,3) = singleRoute(routeIndex);  % Current right end node
+            initEdgeTargetList(Locb, :) = [];            
+        else
+            [Lia, Locb] = ismember([singleRoute(routeIndex+1), singleRoute(routeIndex)], initEdgeTargetList, 'rows');
+            if (1 == Lia)  % Reach a new uncovered edge!
+                partialDistSum = partialDistSum + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
+                partRoute(i,1) = partRoute(i,1) + partialDistSum;
+                partialDistSum = 0; % Restart for the next "meaningful" segment
+                routeIndex = routeIndex + 1;
+                partRoute(i,3) = singleRoute(routeIndex);  % Current right end node
+                initEdgeTargetList(Locb, :) = [];                          
+            else  % Not an uncovered target edge
+                partialDistSum = partialDistSum + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
+                routeIndex = routeIndex + 1;
+            end
+        end
+        %partRoute(i,1) = partRoute(i,1) + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));     
+        %routeIndex = routeIndex + 1;
     end
     
     if (routeIndex < rightMark)
-        partRoute(i,1) = partRoute(i,1) + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
-        routeIndex = routeIndex + 1;       
+        [Lia, Locb] = ismember([singleRoute(routeIndex), singleRoute(routeIndex+1)], initEdgeTargetList, 'rows');
+        if (1 == Lia)
+            partialDistSum = partialDistSum + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
+            partRoute(i,1) = partRoute(i,1) + partialDistSum;
+            %partialDistSum = 0;
+            routeIndex = routeIndex + 1;
+            partRoute(i,3) = singleRoute(routeIndex);
+            initEdgeTargetList(Locb, :) = [];
+        else
+            [Lia, Locb] = ismember([singleRoute(routeIndex+1), singleRoute(routeIndex)], initEdgeTargetList, 'rows');
+            if (1 == Lia)
+                partialDistSum = partialDistSum + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
+                partRoute(i,1) = partRoute(i,1) + partialDistSum;
+                %partialDistSum = 0;
+                routeIndex = routeIndex + 1;
+                partRoute(i,3) = singleRoute(routeIndex);
+                initEdgeTargetList(Locb, :) = [];
+            else
+                routeIndex = routeIndex + 1;
+            end
+        end
+        %partRoute(i,1) = partRoute(i,1) + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
+        %routeIndex = routeIndex + 1;       
     end
-    partRoute(i,3) = singleRoute(routeIndex);
+    %partRoute(i,3) = singleRoute(routeIndex);    
 end
 
 % The last partition finishes all the rest single route
@@ -155,11 +199,34 @@ while ((routeIndex < rightMark) && (ismember([singleRoute(routeIndex), singleRou
     routeIndex = routeIndex + 1;
 end
 partRoute(k,2) = singleRoute(routeIndex);
+partialDistSum = 0;
 while (routeIndex < rightMark) 
-    partRoute(k,1) = partRoute(k,1) + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
-    routeIndex = routeIndex + 1;
+    [Lia, Locb] = ismember([singleRoute(routeIndex), singleRoute(routeIndex+1)], initEdgeTargetList, 'rows');
+    if (1 == Lia)  % Reach a new uncovered edge!
+        partialDistSum = partialDistSum + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
+        partRoute(k,1) = partRoute(k,1) + partialDistSum;
+        partialDistSum = 0; % Restart for the next "meaningful" segment
+        routeIndex = routeIndex + 1;
+        partRoute(k,3) = singleRoute(routeIndex);  % Current right end node
+        initEdgeTargetList(Locb, :) = [];            
+    else
+        [Lia, Locb] = ismember([singleRoute(routeIndex+1), singleRoute(routeIndex)], initEdgeTargetList, 'rows');
+        if (1 == Lia)  % Reach a new uncovered edge!
+            partialDistSum = partialDistSum + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
+            partRoute(k,1) = partRoute(k,1) + partialDistSum;
+            partialDistSum = 0; % Restart for the next "meaningful" segment
+            routeIndex = routeIndex + 1;
+            partRoute(k,3) = singleRoute(routeIndex);  % Current right end node
+            initEdgeTargetList(Locb, :) = [];                          
+        else  % Not an uncovered target edge
+            partialDistSum = partialDistSum + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
+            routeIndex = routeIndex + 1;
+        end
+    end
+    %partRoute(k,1) = partRoute(k,1) + distMat(singleRoute(routeIndex), singleRoute(routeIndex+1));
+    %routeIndex = routeIndex + 1;
 end
-partRoute(k,3) = singleRoute(routeIndex);
+%partRoute(k,3) = singleRoute(routeIndex);
 
 % Only consider the non-zero segments
 l = k;
