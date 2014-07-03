@@ -1,4 +1,4 @@
-function [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = capNearestNeighbors(distMat, edgeTargetList, spMat, spRteMat, hasDoneSp, k, cap, truckLoc, edges)
+function [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = multicoverageNearestNeighbors(distMat, edgeTargetList, spMat, spRteMat, hasDoneSp, k, cap, truckLoc, edges, CoverageMatrix)
 % nearestNeighbors: implement a naive algorithm based on nearest neighbors
 % to solve the maximum number of target edges to cover of the edgeTargetList with the k trucks
 % (truckLoc initial location), each with capacity cap.
@@ -22,8 +22,15 @@ function [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = capNearestNeighbors(
 
 %% Constants
 BIGNUM = inf;
+Truck_Coverage=2;
+Taxi_Coverage=1;
 
 numEdgeTarget = size(edgeTargetList, 1);
+
+
+
+
+
 
 %% Main algorithm
 %% This is the new method: we consider all the target edges aggregatedly ----------------------------------------
@@ -32,6 +39,8 @@ currDist = zeros(k,1); % Record the total distance traveled by each truck: make 
 currNextDist = zeros(k,1); % Next distance to travel to cover the closest target edge
 currSpEdge = zeros(k,1); % Next closest target edge to cover for each truck
 currSpNextNode = truckLoc; % Next starting node of each truck if it were to cover its closes target edge
+previousEdge= zeros(k,1);
+
 
 for j = 1:k
     sp = BIGNUM;
@@ -55,7 +64,7 @@ for j = 1:k
             currSpEdge(j) = i;
             currSpNextNode(j) = edgeTargetList(i,1);
         end
-    end        
+    end
 end
 
 while (numEdgeTarget > 0)
@@ -74,24 +83,35 @@ while (numEdgeTarget > 0)
 %         currNNIndex(j,1) = edgeIndex;
 %         currNNIndex(j,2) = 3 - nodeIndex; % We count the ending node!
 
-    tempDist = currDist + currNextDist;
+
+    tempDist = currNextDist;
     [tempDist, truckIndex] = min(tempDist); % Choose the one that has the currently minimum travel distance
-    if (tempDist > cap)
+    if (currDist + currNextDist > cap)
         break;
     end
     % Update for the truck (truckIndex)
-    currDist(truckIndex) = tempDist;
+    currDist(truckIndex) = currDist(truckIndex) + currNextDist(truckIndex);
     truckLoc(truckIndex) = currSpNextNode(truckIndex);
     coveredEdge = currSpEdge(truckIndex);
+    previousEdge(truckIndex)=coveredEdge;
     % Update the closest uncovered target edge for the k trucks (we only update the ones which are needed)
     updateTruckIndex = (1:k)';
     updateTruckIndex = updateTruckIndex(currSpEdge == coveredEdge); % The set of trucks that needs update
     % Update the set of target edges to cover
     % We first update the index of the edges of all the trucks
     index = (currSpEdge>=coveredEdge);
+    CoverageMatrix(coveredEdge,:)= CoverageMatrix(coveredEdge,:)- Taxi_Coverage;
+    
+    if(CoverageMatrix(coveredEdge,:)<=0)
+    
+    CoverageMatrix(coveredEdge,:)= [];
     currSpEdge(index) = currSpEdge(index) - 1;
     edgeTargetList(coveredEdge, :) = [];
     numEdgeTarget = numEdgeTarget - 1;
+   
+        
+    
+    end
     for l = 1:length(updateTruckIndex)
         j = updateTruckIndex(l);  % Truck index
         sp = BIGNUM;
@@ -99,7 +119,8 @@ while (numEdgeTarget > 0)
             [spMat, spRteMat] = BellmanFord(spMat, spRteMat, distMat, truckLoc(j), edges);
             hasDoneSp(truckLoc(j)) = 1;
         end
-        for i = 1:numEdgeTarget
+        for i = 1:numEdgeTarget 
+            if(i ~= previousEdge(j))
             tempSp = spMat(truckLoc(j), edgeTargetList(i,1)) + distMat(edgeTargetList(i,1), edgeTargetList(i,2));
             if (tempSp < sp)
                 sp = tempSp;
@@ -107,6 +128,8 @@ while (numEdgeTarget > 0)
                 currSpEdge(j) = i;
                 currSpNextNode(j) = edgeTargetList(i,2);
             end
+            
+            
 
             tempSp = spMat(truckLoc(j), edgeTargetList(i,2)) + distMat(edgeTargetList(i,2), edgeTargetList(i,1));
             if (tempSp < sp)
@@ -114,6 +137,7 @@ while (numEdgeTarget > 0)
                 currNextDist(j) = tempSp;
                 currSpEdge(j) = i;
                 currSpNextNode(j) = edgeTargetList(i,1);
+            end
             end
         end
     end   

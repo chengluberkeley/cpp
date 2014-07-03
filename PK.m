@@ -69,7 +69,7 @@ while (numEdgeTarget > 0)
             spRte = computeSP(spRteMat, leftNode, beforeNode);
             % Update the single route
             rteLength = length(spRte)-1;
-            singleRoute(1, leftMark-rteLength:leftMark) = flip(spRte);
+            singleRoute(1, leftMark-rteLength:leftMark) = fliplr(spRte);
             leftMark = leftMark - rteLength - 1;
             singleRoute(1, leftMark) = edgeTargetList(edgeIndex, 2);
             leftNode = singleRoute(1, leftMark);
@@ -79,7 +79,7 @@ while (numEdgeTarget > 0)
             spRte = computeSP(spRteMat, leftNode, beforeNode);
             % Update the single route
             rteLength = length(spRte)-1;
-            singleRoute(1, leftMark-rteLength:leftMark) = flip(spRte);
+            singleRoute(1, leftMark-rteLength:leftMark) = fliplr(spRte);
             leftMark = leftMark - rteLength - 1;
             singleRoute(1, leftMark) = edgeTargetList(edgeIndex, 1);
             leftNode = singleRoute(1, leftMark);

@@ -28,7 +28,7 @@ nodes = xyCoord;
 %load UtAtkUnc.mat;
 
 %% Constants for initialization
-BIGNUM = inf;
+BIGNUM = inf; 
 filename = '06-10-2014.mat'; % Output filename
 PM_SWITCH = 1; % Switch to determine which minimum cost perfect matching subroutine to use.
                % 0: the downloaded exact algorithm (slow)
@@ -93,14 +93,18 @@ hasDoneSp = zeros(n,1); % Record whether we have computed the shortest paths fro
 % capacity to cover it. (NN)
 
 % Scenario constants, subject to change. Note: now we only consider trucks!
-DAYS = 1; % Total days to consider. Assume one attack per day
-TRUCK_AVAILABLE = [3,7,11,15]; % This is the number of available TRUCKS each day;
-TRUCK_CAPACITY = [4000, 4250, 4500];  % Every day's capacity of each truck. Note that now every truck does not need to return to its respective starting point
-TAXI_CAPACITY = [2000, 2250, 2500]; % Every day's taxi capacity.
+DAYS = 100; % Total days to consider. Assume one attack per day
+TRUCK_AVAILABLE = 0; % This is the number of available TRUCKS each day;
+TRUCK_CAPACITY = 4000;  % Every day's capacity of each truck. Note that now every truck does not need to return to its respective starting point
+TAXI_CAPACITY = 4000; % Every day's taxi capacity.
 % DEPOT_ID = 28; % Depot ID % No depot. Instead, let's assume that every
 % day the k trucks will start at an edge uniformly!
-N_RUN = 10; % Number of runs for the same configuration.
+N_RUN = 1; % Number of runs for the same configuration.
 N_TARGET_EDGE = 20; % The number of target edges to protect. We gradually increase the density of target edges
+EDGECOVERAGE1_PROB=.4; % Probability of a target edge having an edgecoverage of 1 
+STARTINGLOC=[30,74,57,42,99,70,66,110,35,91,90,46,69,10,7,64,93,112,16,68,56,2,41,20,95,38,63,20,72,32,78,83,90,54,10,28,109,19,99,65,119,10,53,13,115,1,93,98,104,11];
+
+
 
 
 
@@ -108,11 +112,12 @@ N_TARGET_EDGE = 20; % The number of target edges to protect. We gradually increa
 % Here we don't have the "capacity". We only compute the shortest total distance (and the maximum single truck distance) to cover a specific set of target edges 
 % Total distances
 %aveTaxiNumPK = zeros(length(TRUCK_AVAILABLE),length(TRUCK_CAPACITY), length(N_TARGET_EDGE)); 
-aveTaxiNumNN = zeros(length(TRUCK_AVAILABLE),length(TRUCK_CAPACITY), length(N_TARGET_EDGE));
+aveTaxiNumNN = zeros(length(N_RUN));
+sdTaxiNumNN = zeros(length(N_RUN));
 
 % For standard deviation computing
 %sdTaxiNumPK = zeros(length(TRUCK_AVAILABLE), length(TRUCK_CAPACITY), length(N_TARGET_EDGE), N_RUN);
-sdTaxiNumNN = zeros(length(TRUCK_AVAILABLE), length(TRUCK_CAPACITY), length(N_TARGET_EDGE), N_RUN);
+%sdTaxiNumNN = zeros(length(TRUCK_AVAILABLE), length(TRUCK_CAPACITY), length(N_TARGET_EDGE), N_RUN);
 
 
 %% Run N_RUN number of different realization of the targets to defense/attack and compute the average MAXIMUM TOTAL DISTANCE/SINGLE TRUCK DISTANCE BY EACH METHOD!
@@ -137,6 +142,8 @@ for runtime = 1:N_RUN
             randDefProb = rand(1);
             index = f_whichisit(randDefProb, varSumProb);
             defenceVectorU(j,i) = varEdgeTargetIndexList(index);
+            %EdgeCoverage=zeros(j,i);
+            %EdgeCoverage(index)=randi([1,2]);
             % Update the probabilities and the sum of probabilities:
             % conditional probabilities!
             varProb(index) = [];
@@ -154,45 +161,61 @@ for runtime = 1:N_RUN
     for nTargetEdge = 1:length(N_TARGET_EDGE)
         %% Prepare the set of edges to protect every day
         defenceVector = defenceVectorU(1:N_TARGET_EDGE(nTargetEdge), :);
+        sizedefenceVector= size(defenceVector);
+        EdgeCoverage= zeros(sizedefenceVector(1), sizedefenceVector(2));
+
+     end
     
         %% Case 1: Uniform distribution + PK; Case 2: Uniform distribution + NN
         % Note that here we will put the two scenarios into the same for loops,
         % because at every day they need to share the same initial positions
         % for the k trucks
-        for numV = 1:length(TRUCK_AVAILABLE)
-            for cap = 1:length(TRUCK_CAPACITY)
+       % for numV = 1:length(TRUCK_AVAILABLE)
+            for cap = 1:length(TAXI_CAPACITY)
                 %taxiNumPK = zeros(1, DAYS);
                 taxiNumNN = zeros(1, DAYS);
         
                 for day = 1:DAYS % Check day-by-day
+                    for i=1:sizedefenceVector(1)
+                        for j=1:sizedefenceVector(2)
+                
+                    EdgeCoverage(i,j)= randsample([1,2], 1, true, [EDGECOVERAGE1_PROB, 1-EDGECOVERAGE1_PROB]);
+                        end
+                    end
+
+                
                     % Generate the initial points of the k trucks. Note that
                     % here we assume that the trucks starting at nodes (intersection)
-                    truckLoc = randi(n, TRUCK_AVAILABLE(numV), 1);
+                    %truckLoc = randi(n, TRUCK_AVAILABLE(numV), 1);
                     % PK method
                     %[leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = PK(distMat, unifEdgeTargetList(defenceVector(:, day), :), spMat, spRteMat, hasDoneSp, V_AVAILABLE(numV), truckLoc, edges);
                     %if ~isempty(leftEdgeTargetList)  % We need taxis to help full 
                         
                     %end
                     % NN method
-                    [initLeftEdgeTargetList, spMat, spRteMat, hasDoneSp] = capNearestNeighbors(distMat, unifEdgeTargetList(defenceVector(:, day), :), spMat, spRteMat, hasDoneSp, TRUCK_AVAILABLE(numV), TRUCK_CAPACITY(cap), truckLoc, edges);
-                    if ~isempty(initLeftEdgeTargetList)  % We need taxis to help cover the rest target edges
+                    %[initLeftEdgeTargetList, spMat, spRteMat, hasDoneSp] = capNearestNeighbors(distMat, unifEdgeTargetList(defenceVector(:, day), :), spMat, spRteMat, hasDoneSp, TRUCK_AVAILABLE(numV), TRUCK_CAPACITY(cap), truckLoc, edges, EdgeCoverage(:,day));
+                    %if ~isempty(initLeftEdgeTargetList)  % We need taxis to help cover the rest target edges
                         % We use a binary search algorithm to determine the
                         % minimum number of taxis needed                       
                         high = 1;
                         low = 0;
+                        %To determine if capNN is calculating w
                         % First find the high end of the search space
-                        taxiLoc = randi(n, high, 1);
-                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = capNearestNeighbors(distMat, initLeftEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TAXI_CAPACITY(cap), taxiLoc, edges);                     
+                        %taxiLoc = randi(n, high, 1);
+                        taxiLoc=STARTINGLOC(1);
+                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = multicoverageNearestNeighbors(distMat, unifEdgeTargetList(defenceVector(:, day), :), spMat, spRteMat, hasDoneSp, high, TAXI_CAPACITY(cap), taxiLoc, edges, EdgeCoverage(:,day));                     
                         while (~isempty(leftEdgeTargetList))
                             low = high;
                             high = high*2;
-                            taxiLoc = [taxiLoc; randi(n, high-low, 1)];
-                            [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = capNearestNeighbors(distMat, initLeftEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TAXI_CAPACITY(cap), taxiLoc, edges);                     
+                            taxiLoc = STARTINGLOC(1:high);                            
+                            %taxiLoc = [taxiLoc; ];
+                            [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = multicoverageNearestNeighbors(distMat, unifEdgeTargetList(defenceVector(:, day), :), spMat, spRteMat, hasDoneSp, high, TAXI_CAPACITY(cap), taxiLoc, edges, EdgeCoverage(:,day));                     
                         end
                         
                         while (high - low > 1)
                             med = floor((low + high)/2);
-                            [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = capNearestNeighbors(distMat, initLeftEdgeTargetList, spMat, spRteMat, hasDoneSp, med, TAXI_CAPACITY(cap), taxiLoc(1:med,1), edges);
+                            taxiLoc= STARTINGLOC(1:med);
+                            [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = multicoverageNearestNeighbors(distMat, unifEdgeTargetList(defenceVector(:, day), :), spMat, spRteMat, hasDoneSp, med, TAXI_CAPACITY(cap), taxiLoc, edges, EdgeCoverage(:,day));
                             if (~isempty(leftEdgeTargetList))
                                 low = med;
                             else
@@ -200,38 +223,40 @@ for runtime = 1:N_RUN
                             end
                         end
                         
+                        totaltaxiNumNN(runtime,day)=high;
                         taxiNumNN(day) = high;
-                    end
-                end
+                 end
+             end
  
                 % NN
-                aveTaxiNumNN(numV, cap, nTargetEdge) = aveTaxiNumNN(numV, cap, nTargetEdge) + sum(taxiNumNN)/DAYS;
-                sdTaxiNumNN(numV, cap, nTargetEdge, runtime) = sum(taxiNumNN)/DAYS;
-            end
-        end
-    end
+                aveTaxiNumNN(runtime) = sum(taxiNumNN)/DAYS;
+                sdTaxiNumNN(runtime)= std(aveTaxiNumNN);
+                %sdTaxiNumNN(numV, cap, nTargetEdge, runtime) = std(taxiNumNN);
 end
+        
+ 
 
 
 %% Compute the final result
 % Compute averages
-aveTaxiNumNN = aveTaxiNumNN/N_RUN;
+aveTaxiNumNN = sum(aveTaxiNumNN)/N_RUN;
+sdTaxiNumNN= std(taxiNumNN);
 
 % Compute standard deviations
-sdTNN = zeros(length(TRUCK_AVAILABLE), length(TRUCK_CAPACITY), length(N_TARGET_EDGE));
+%sdTNN = zeros(length(TRUCK_AVAILABLE), length(TRUCK_CAPACITY), length(N_TARGET_EDGE));
 
-for numV = 1:length(TRUCK_AVAILABLE)
-    for cap = 1:length(TRUCK_CAPACITY)
-        for nTargetEdge = 1:length(N_TARGET_EDGE)
-            for runtime = 1:N_RUN
-                sdTNN(numV, cap, nTargetEdge) = sdTNN(numV, cap, nTargetEdge) + (sdTaxiNumNN(numV,cap,nTargetEdge,runtime) - aveTaxiNumNN(numV, cap, nTargetEdge))*(sdTaxiNumNN(numV,cap,nTargetEdge,runtime) - aveTaxiNumNN(numV,cap,nTargetEdge));
-            end
-        end
-    end
-end
+%for numV = 1:length(TRUCK_AVAILABLE)
+    %for cap = 1:length(TRUCK_CAPACITY)
+        %for nTargetEdge = 1:length(N_TARGET_EDGE)
+         %   for runtime = 1:N_RUN
+         %       sdTNN(numV, cap, nTargetEdge) = sdTNN(numV, cap, nTargetEdge) + (sdTaxiNumNN(numV,cap,nTargetEdge,runtime) - aveTaxiNumNN(numV, cap, nTargetEdge))*(sdTaxiNumNN(numV,cap,nTargetEdge,runtime) - aveTaxiNumNN(numV,cap,nTargetEdge));
+         %   end
+       % end
+    %end
+%end
 
 
-sdTNN = sqrt(1/(N_RUN-1)*sdTNN);
+%sdTNN = sqrt(1/(N_RUN-1)*sdTNN);
 
 % Write to file
-save(filename, 'TRUCK_AVAILABLE', 'TRUCK_CAPACITY', 'TAXI_CAPACITY', 'N_TARGET_EDGE', 'aveTaxiNumNN', 'sdTNN');
+save(filename, 'TRUCK_AVAILABLE', 'TRUCK_CAPACITY', 'TAXI_CAPACITY', 'N_TARGET_EDGE', 'aveTaxiNumNN', 'sdTaxiNumNN', 'totaltaxiNumNN');
