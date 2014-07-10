@@ -10,14 +10,15 @@ clear;
 %% Load basic info of the problem
 %load SFStreetGraph.mat; % INPUT: edges and nodes
 % We may load the protection probabilities later!
-load('./Santiago/edgeList.mat');
-load('./Santiago/XY_coord.mat');
+load('./SF/SFStreetGraph.mat');
+%load('./Santiago/XY_coord.mat');
 % Rename edges
-edges = edgeList;
+%edges = edgeList;
 % Rename node coordinates
 %xyCoord = nodes;
-xyCoord = XY_coord;
-nodes = xyCoord;
+%xyCoord = XY_coord;
+xyCoord = nodes;
+%nodes = xyCoord;
 %load edgeProbs15.mat;
 %load attackSet15.mat; % INPUT
 % (INPUT) Utility vectors of defender and attacker. They each is a vector
@@ -29,7 +30,7 @@ nodes = xyCoord;
 
 %% Constants for initialization
 BIGNUM = inf;
-filename = '06-27-2014_2.mat'; % Output filename
+filename = '07-10-2014_1.mat'; % Output filename
 PM_SWITCH = 1; % Switch to determine which minimum cost perfect matching subroutine to use.
                % 0: the downloaded exact algorithm (slow)
                % 1: the heuristic algortihm (fast)
@@ -91,8 +92,9 @@ hasDoneSp = zeros(n,1); % Record whether we have computed the shortest paths fro
 
 %% Pre-computation for the wedge partitioning
 % Find the center as the relative origin (may be changed to other selection method later)
-sortedCoord = sort(nodes);
-originCoord = sortedCoord(floor(length(nodes)/2), :);
+%sortedCoord = sort(nodes);
+%originCoord = sortedCoord(floor(length(nodes)/2), :);
+originCoord = [-4.48*1e5, 4.181*1e6];
 % Compute the polar coordinates of each nodes
 % Shift the nodes coordinates
 originCoord = repmat(originCoord, length(nodes), 1);
@@ -107,10 +109,13 @@ rhoNodes = rhoNodes(sortedIndex);
 truckLoc = sortedIndex(truckLoc);  % Shared initial location of the trucks
 
 % Constant to determine the cutting percent of radius counted as "peripherals"
-RADIUS_PERCENT = 0.1;
+RADIUS_PERCENT = 0.35;
+SECOND_RADIUS_PERCENT = 0.7; 
 
 maxRho = max(rhoNodes);
 periNodes = sortedIndex(rhoNodes > maxRho*RADIUS_PERCENT);
+innerPeriNodes = sortedIndex(rhoNodes > maxRho*RADIUS_PERCENT & rhoNodes <= maxRho*SECOND_RADIUS_PERCENT);
+outerPeriNodes = sortedIndex(rhoNodes > maxRho*SECOND_RADIUS_PERCENT);
 
 % Generate the set of peripheral edges
 unifEdgeTargetList = generateEdgeSet(edges, periNodes);
@@ -130,7 +135,7 @@ TRUCK_CAPACITY = [4000, 4250, 4500];  % Every day's capacity of each truck. Note
 % DEPOT_ID = 28; % Depot ID % No depot. Instead, let's assume that every
 % day the k trucks will start at an edge uniformly!
 N_RUN = 10; % Number of runs for the same configuration.
-N_TARGET_EDGE = [floor(unifNumEdgeTarget*0.05), floor(unifNumEdgeTarget*0.1), floor(unifNumEdgeTarget*0.25), floor(unifNumEdgeTarget*0.5), floor(unifNumEdgeTarget*0.8)]; % The number of target edges to protect. We gradually increase the density of target edges
+N_TARGET_EDGE = [floor(unifNumEdgeTarget*0.25), floor(unifNumEdgeTarget*0.5), floor(unifNumEdgeTarget*0.8)]; % The number of target edges to protect. We gradually increase the density of target edges
 
 
 
@@ -222,76 +227,95 @@ for runtime = 1:N_RUN
                     %end
                     
                     % WD method
+                    % Intercircle                 
                     currLeft = 1;
                     todayEdgeTargetList = unifEdgeTargetList(defenceVector(:, day), :);
+                    innerEdgeTargetList = generateEdgeSet(todayEdgeTargetList, innerPeriNodes);
                     while (currLeft < length(nodes))
                         currRight = length(nodes);
-                        examEdgeTargetList = generateEdgeSet(todayEdgeTargetList, sortedIndex(currLeft:currRight,:));                                  
+                        examEdgeTargetList = generateEdgeSet(innerEdgeTargetList, sortedIndex(currLeft:currRight,:));                                  
                         [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, examEdgeTargetList, spMat, spRteMat, hasDoneSp, 1, TRUCK_CAPACITY(cap), truckLoc, edges, IS_BACK, 0, 1);
                         while (~isempty(leftEdgeTargetList))
                             currRight = floor((currLeft + currRight)/2);
-                            examEdgeTargetList = generateEdgeSet(todayEdgeTargetList, sortedIndex(currLeft:currRight, :));
+                            examEdgeTargetList = generateEdgeSet(innerEdgeTargetList, sortedIndex(currLeft:currRight, :));
                             [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, examEdgeTargetList, spMat, spRteMat, hasDoneSp, 1, TRUCK_CAPACITY(cap), truckLoc, edges, IS_BACK, 0, 1);
                         end
                         currLeft = currRight;
                         truckNumWD(day) = truckNumWD(day) + 1;
                     end
                     
+                    % Outercircle                 
+                    currLeft = 1;
+                    todayEdgeTargetList = unifEdgeTargetList(defenceVector(:, day), :);
+                    outerEdgeTargetList = generateEdgeSet(todayEdgeTargetList, outerPeriNodes);
+                    while (currLeft < length(nodes))
+                        currRight = length(nodes);
+                        examEdgeTargetList = generateEdgeSet(outerEdgeTargetList, sortedIndex(currLeft:currRight,:));                                  
+                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, examEdgeTargetList, spMat, spRteMat, hasDoneSp, 1, TRUCK_CAPACITY(cap), truckLoc, edges, IS_BACK, 0, 1);
+                        while (~isempty(leftEdgeTargetList))
+                            currRight = floor((currLeft + currRight)/2);
+                            examEdgeTargetList = generateEdgeSet(outerEdgeTargetList, sortedIndex(currLeft:currRight, :));
+                            [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, examEdgeTargetList, spMat, spRteMat, hasDoneSp, 1, TRUCK_CAPACITY(cap), truckLoc, edges, IS_BACK, 0, 1);
+                        end
+                        currLeft = currRight;
+                        truckNumWD(day) = truckNumWD(day) + 1;
+                    end
+                                       
                     % NN method
                     % IS_NEXT == 0, IS_RETURN_COUNT == 0
                     % We use a binary search algorithm to determine the
                     % minimum number of trucks needed.
-                    high = 1;
-                    low = 0;
-                    % First find the high end of the search space
-                    shareLoc = zeros(high, 1) + truckLoc;
-                    [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 0, 0);
-                    while (~isempty(leftEdgeTargetList))
-                        low = high;
-                        high = high*2;
-                        shareLoc = zeros(high, 1)+truckLoc;
-                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 0, 0);
-                    end
-                        
-                    while (high - low > 1)
-                        med = floor((low + high)/2);
-                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, med, TRUCK_CAPACITY(cap), shareLoc(1:med,1), edges, IS_BACK, 0, 0);
-                        if (~isempty(leftEdgeTargetList))
-                            low = med;
-                        else
-                            high = med;
-                        end
-                    end
-                        
-                    truckNumNN_00(day) = high;                    
+%                     high = 1;
+%                     low = 0;
+%                     % First find the high end of the search space
+%                     shareLoc = zeros(high, 1) + truckLoc;
+%                     [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 0, 0);
+%                     while (~isempty(leftEdgeTargetList))
+%                         low = high;
+%                         high = high*2;
+%                         shareLoc = zeros(high, 1)+truckLoc;
+%                         [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 0, 0);
+%                     end
+%                         
+%                     while (high - low > 1)
+%                         med = floor((low + high)/2);
+%                         [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, med, TRUCK_CAPACITY(cap), shareLoc(1:med,1), edges, IS_BACK, 0, 0);
+%                         if (~isempty(leftEdgeTargetList))
+%                             low = med;
+%                         else
+%                             high = med;
+%                         end
+%                     end
+%                         
+%                     truckNumNN_00(day) = high;                    
 
                     % NN method
                     % IS_NEXT == 0, IS_RETURN_COUNT == 1
                     % We use a binary search algorithm to determine the
-                    % minimum number of trucks needed.
-                    high = 1;
-                    low = 0;
-                    % First find the high end of the search space
-                    shareLoc = zeros(high, 1) + truckLoc;
-                    [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 0, 1);
-                    while (~isempty(leftEdgeTargetList))
-                        low = high;
-                        high = high*2;
-                        shareLoc = zeros(high, 1)+truckLoc;
-                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 0, 1);
-                    end
-                        
-                    while (high - low > 1)
-                        med = floor((low + high)/2);
-                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, med, TRUCK_CAPACITY(cap), shareLoc(1:med,1), edges, IS_BACK, 0, 1);
-                        if (~isempty(leftEdgeTargetList))
-                            low = med;
-                        else
-                            high = med;
-                        end
-                    end
-                        
-                    truckNumNN_01(day) = high;                    
+%                     % minimum number of trucks needed.
+%                     high = 1;
+%                     low = 0;
+%                     % First find the high end of the search space
+%                     shareLoc = zeros(high, 1) + truckLoc;
+%                     [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 0, 1);
+%                     while (~isempty(leftEdgeTargetList))
+%                         low = high;
+%                         high = high*2;
+%                         shareLoc = zeros(high, 1)+truckLoc;
+%                         [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 0, 1);
+%                     end
+%                         
+%                     while (high - low > 1)
+%                         med = floor((low + high)/2);
+%                         [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, med, TRUCK_CAPACITY(cap), shareLoc(1:med,1), edges, IS_BACK, 0, 1);
+%                         if (~isempty(leftEdgeTargetList))
+%                             low = med;
+%                         else
+%                             high = med;
+%                         end
+%                     end
+%                         
+%                     truckNumNN_01(day) = high;                    
                     
                     % NN method
                     % IS_NEXT == 1, IS_RETURN_COUNT == 0
@@ -325,33 +349,33 @@ for runtime = 1:N_RUN
                     % IS_NEXT == 1, IS_RETURN_COUNT == 1
                     % We use a binary search algorithm to determine the
                     % minimum number of trucks needed.
-                    high = 1;
-                    low = 0;
-                    % First find the high end of the search space
-                    shareLoc = zeros(high, 1) + truckLoc;
-                    [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 1, 1);
-                    while (~isempty(leftEdgeTargetList))
-                        low = high;
-                        high = high*2;
-                        shareLoc = zeros(high, 1)+truckLoc;
-                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 1, 1);
-                    end
-                        
-                    while (high - low > 1)
-                        med = floor((low + high)/2);
-                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, med, TRUCK_CAPACITY(cap), shareLoc(1:med,1), edges, IS_BACK, 1, 1);
-                        if (~isempty(leftEdgeTargetList))
-                            low = med;
-                        else
-                            high = med;
-                        end
-                    end
-                        
-                    truckNumNN_11(day) = high;                                      
+%                     high = 1;
+%                     low = 0;
+%                     % First find the high end of the search space
+%                     shareLoc = zeros(high, 1) + truckLoc;
+%                     [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 1, 1);
+%                     while (~isempty(leftEdgeTargetList))
+%                         low = high;
+%                         high = high*2;
+%                         shareLoc = zeros(high, 1)+truckLoc;
+%                         [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 1, 1);
+%                     end
+%                         
+%                     while (high - low > 1)
+%                         med = floor((low + high)/2);
+%                         [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, med, TRUCK_CAPACITY(cap), shareLoc(1:med,1), edges, IS_BACK, 1, 1);
+%                         if (~isempty(leftEdgeTargetList))
+%                             low = med;
+%                         else
+%                             high = med;
+%                         end
+%                     end
+%                         
+%                     truckNumNN_11(day) = high;                                      
                     
                     
                     % Pick the minimum of the 4 rules
-                    truckNumNN(day) = min([truckNumNN_00(day), truckNumNN_01(day), truckNumNN_10(day), truckNumNN_11(day)]);
+%                     truckNumNN(day) = min([truckNumNN_10(day), truckNumNN_11(day)]);
                 end
  
                 % WD
@@ -419,4 +443,4 @@ sdTNN_11 = sqrt(1/(N_RUN-1)*sdTNN_11);
 sdTNN = sqrt(1/(N_RUN-1)*sdTNN);
 
 % Write to file
-save(filename, 'RADIUS_PERCENT', 'TRUCK_CAPACITY', 'N_TARGET_EDGE', 'aveTruckNumWD', 'sdTWD', 'aveTruckNumNN', 'sdTNN', 'aveTruckNumNN_00', 'sdTNN_00', 'aveTruckNumNN_01', 'sdTNN_01', 'aveTruckNumNN_10', 'sdTNN_10','aveTruckNumNN_11', 'sdTNN_11');
+save(filename, 'RADIUS_PERCENT', 'SECOND_RADIUS_PERCENT', 'TRUCK_CAPACITY', 'N_TARGET_EDGE', 'aveTruckNumWD', 'sdTWD', 'aveTruckNumNN', 'sdTNN', 'aveTruckNumNN_00', 'sdTNN_00', 'aveTruckNumNN_01', 'sdTNN_01', 'aveTruckNumNN_10', 'sdTNN_10','aveTruckNumNN_11', 'sdTNN_11');
