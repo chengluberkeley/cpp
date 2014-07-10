@@ -1,4 +1,4 @@
-function [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = multicoverageNearestNeighbors(distMat, edgeTargetList, spMat, spRteMat, hasDoneSp, k, cap, truckLoc, edges, CoverageMatrix)
+function [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = multicoverageNearestNeighbors(distMat, edgeTargetList, spMat, spRteMat, hasDoneSp, k, cap, truckLoc, edges, CoverageMatrix, coverageCap)
 % nearestNeighbors: implement a naive algorithm based on nearest neighbors
 % to solve the maximum number of target edges to cover of the edgeTargetList with the k trucks
 % (truckLoc initial location), each with capacity cap.
@@ -22,14 +22,12 @@ function [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = multicoverageNearest
 
 %% Constants
 BIGNUM = inf;
-Truck_Coverage=2;
-Taxi_Coverage=1;
+%Truck_Coverage=2;
+%Taxi_Coverage=1;
 
 numEdgeTarget = size(edgeTargetList, 1);
-
-
-
-
+numEdgeUncovered = numEdgeTarget;
+initTruckLoc = truckLoc;
 
 
 %% Main algorithm
@@ -67,7 +65,7 @@ for j = 1:k
     end
 end
 
-while (numEdgeTarget > 0)
+while (numEdgeUncovered > 0)
 %         % Vectorization implementation!
 %         tempSp = zeros(numEdgeTarget, 2);
 %         tempSp(:,1) = spMat(truckLoc(j), edgeTargetList(:,1));
@@ -83,35 +81,63 @@ while (numEdgeTarget > 0)
 %         currNNIndex(j,1) = edgeIndex;
 %         currNNIndex(j,2) = 3 - nodeIndex; % We count the ending node!
 
-
-    tempDist = currNextDist;
-    [tempDist, truckIndex] = min(tempDist); % Choose the one that has the currently minimum travel distance
-    if (currDist + currNextDist > cap)
+    % We need to consider that the vehicles need to come back
+    for j = 1:k
+        if (0 == hasDoneSp(currSpNextNode(j)))
+            [spMat, spRteMat] = BellmanFord(spMat, spRteMat, distMat, currSpNextNode(j), edges);
+            hasDoneSp(currSpNextNode(j)) = 1;
+        end        
+    end
+    sp = BIGNUM;
+    isFound = false;
+    for j = 1:k
+        if ((currSpEdge(j) > 0) && (currDist(j) + currNextDist(j) + spMat(currSpNextNode(j), initTruckLoc(j)) <= cap) && (currNextDist(j) < sp))
+            sp = currNextDist(j);
+            truckIndex = j;
+            isFound = true;               
+        end
+    end
+    if (~isFound)
         break;
     end
+
+    %tempDist = currNextDist;
+    %[tempDist, truckIndex] = min(tempDist); % Choose the one that has the currently minimum travel distance
+    %if (currDist + currNextDist > cap)
+    %    break;
+    %end
+    
     % Update for the truck (truckIndex)
     currDist(truckIndex) = currDist(truckIndex) + currNextDist(truckIndex);
     truckLoc(truckIndex) = currSpNextNode(truckIndex);
     coveredEdge = currSpEdge(truckIndex);
-    previousEdge(truckIndex)=coveredEdge;
-    % Update the closest uncovered target edge for the k trucks (we only update the ones which are needed)
-    updateTruckIndex = (1:k)';
-    updateTruckIndex = updateTruckIndex(currSpEdge == coveredEdge); % The set of trucks that needs update
+    previousEdge(truckIndex) = coveredEdge;
+    % Update the coverage number
+    CoverageMatrix(coveredEdge) = CoverageMatrix(coveredEdge) - coverageCap;
+    if (CoverageMatrix(coveredEdge) <= 0)  % Done with the edge
+        numEdgeUncovered = numEdgeUncovered - 1;
+        % Update the closest uncovered target edge for the k trucks (we only update the ones which are needed)
+        updateTruckIndex = (1:k)';
+        updateTruckIndex = updateTruckIndex(currSpEdge == coveredEdge); % The set of trucks that needs update
+    else
+        updateTruckIndex = truckIndex;
+    end
+    
     % Update the set of target edges to cover
     % We first update the index of the edges of all the trucks
-    index = (currSpEdge>=coveredEdge);
-    CoverageMatrix(coveredEdge,:)= CoverageMatrix(coveredEdge,:)- Taxi_Coverage;
+    %index = (currSpEdge>=coveredEdge);
+    %CoverageMatrix(coveredEdge,:)= CoverageMatrix(coveredEdge,:)- Taxi_Coverage;
     
-    if(CoverageMatrix(coveredEdge,:)<=0)
-    
-    CoverageMatrix(coveredEdge,:)= [];
-    currSpEdge(index) = currSpEdge(index) - 1;
-    edgeTargetList(coveredEdge, :) = [];
-    numEdgeTarget = numEdgeTarget - 1;
-   
-        
-    
-    end
+%     if(CoverageMatrix(coveredEdge,:)<=0)
+%     
+%     CoverageMatrix(coveredEdge,:)= [];
+%     currSpEdge(index) = currSpEdge(index) - 1;
+%     edgeTargetList(coveredEdge, :) = [];
+%     numEdgeTarget = numEdgeTarget - 1;
+%    
+%         
+%     
+%     end
     for l = 1:length(updateTruckIndex)
         j = updateTruckIndex(l);  % Truck index
         sp = BIGNUM;
@@ -119,31 +145,50 @@ while (numEdgeTarget > 0)
             [spMat, spRteMat] = BellmanFord(spMat, spRteMat, distMat, truckLoc(j), edges);
             hasDoneSp(truckLoc(j)) = 1;
         end
+        currSpEdge(j) = 0;
+        
         for i = 1:numEdgeTarget 
-            if(i ~= previousEdge(j))
-            tempSp = spMat(truckLoc(j), edgeTargetList(i,1)) + distMat(edgeTargetList(i,1), edgeTargetList(i,2));
-            if (tempSp < sp)
-                sp = tempSp;
-                currNextDist(j) = tempSp;
-                currSpEdge(j) = i;
-                currSpNextNode(j) = edgeTargetList(i,2);
-            end
-            
-            
+            if (CoverageMatrix(i) > 0)  % We only consider those with positive coverage demand uncovered
+                if (i ~= previousEdge(j))
+                    tempSp = spMat(truckLoc(j), edgeTargetList(i,1)) + distMat(edgeTargetList(i,1), edgeTargetList(i,2));
+                    if (tempSp < sp)
+                        sp = tempSp;
+                        currNextDist(j) = tempSp;
+                        currSpEdge(j) = i;
+                        currSpNextNode(j) = edgeTargetList(i,2);
+                    end
 
-            tempSp = spMat(truckLoc(j), edgeTargetList(i,2)) + distMat(edgeTargetList(i,2), edgeTargetList(i,1));
-            if (tempSp < sp)
-                sp = tempSp;
-                currNextDist(j) = tempSp;
-                currSpEdge(j) = i;
-                currSpNextNode(j) = edgeTargetList(i,1);
+                    tempSp = spMat(truckLoc(j), edgeTargetList(i,2)) + distMat(edgeTargetList(i,2), edgeTargetList(i,1));
+                    if (tempSp < sp)
+                        sp = tempSp;
+                        currNextDist(j) = tempSp;
+                        currSpEdge(j) = i;
+                        currSpNextNode(j) = edgeTargetList(i,1);
+                    end
+                end
             end
+        end
+        
+        %% Deal with extreme cases: We have to make the vehicle cover the same "previous" edge
+        if (currSpEdge(j) == 0)
+            if ((previousEdge(j) > 0) && (CoverageMatrix(previousEdge(j)) > 0))
+                if truckLoc(j) == edgeTargetList(previousEdge(j), 1)
+                    currNextDist(j) = distMat(edgeTargetList(previousEdge(j),1), edgeTargetList(previousEdge(j), 2));
+                    currSpEdge(j) = previousEdge(j);
+                    currSpNextNode(j) = edgeTargetList(i,2);                
+                else
+                    currNextDist(j) = distMat(edgeTargetList(previousEdge(j),1), edgeTargetList(previousEdge(j), 2));
+                    currSpEdge(j) = previousEdge(j);
+                    currSpNextNode(j) = edgeTargetList(i,1); 
+                end
             end
         end
     end   
 end
 
-leftEdgeTargetList = edgeTargetList;
+%leftEdgeTargetList = edgeTargetList;
+leftEdgeTargetList = find(CoverageMatrix > 0);
+
 %totalDist = sum(currDist);
 %maxDist = max(currDist);
 %% This is an old method: we consider each truck separately. But a better way be to consider all the target edges aggregatedly -------------------------------------------
