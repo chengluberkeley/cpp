@@ -1,6 +1,6 @@
-function sp = computeSP(rteMat, i, j)
+function sp = computeSPMatFW(rteMat, i, j)
 % computeSP: recover the shortest path route based on the intermediate node
-%   infomation
+%   infomation, using the Floyd-Warshall algorithm
 
 %% Input
 % rteMat: the shortest path route intermediate node information
@@ -16,8 +16,9 @@ if (rteMat(i,j) == i)
     return;
 else
     k = rteMat(i,j);
-    sp1 = computeSP(rteMat, i, k);
-    sp = [sp1, j];
+    sp1 = computeSPMatFW(rteMat, i, k);
+    sp2 = computeSPMatFW(rteMat, k, j);
+    sp = [sp1, sp2(2:length(sp2))];
     return;
 end
 end

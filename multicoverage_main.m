@@ -29,7 +29,7 @@ nodes = xyCoord;
 
 %% Constants for initialization
 BIGNUM = inf; 
-filename = '07-10-2014_2.mat'; % Output filename
+filename = '07-17-2014_1_basic.mat'; % Output filename
 PM_SWITCH = 1; % Switch to determine which minimum cost perfect matching subroutine to use.
                % 0: the downloaded exact algorithm (slow)
                % 1: the heuristic algortihm (fast)

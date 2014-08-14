@@ -30,7 +30,7 @@ xyCoord = nodes;
 
 %% Constants for initialization
 BIGNUM = inf;
-filename = '07-10-2014_1.mat'; % Output filename
+filename = '07-16-2014_1.mat'; % Output filename
 PM_SWITCH = 1; % Switch to determine which minimum cost perfect matching subroutine to use.
                % 0: the downloaded exact algorithm (slow)
                % 1: the heuristic algortihm (fast)
@@ -68,17 +68,18 @@ n = size(nodes, 1); % Number of nodes.
 %MM = sum(probs);
 
 % Compute the geometric distances
-distMat = zeros(n,n) + BIGNUM;
-for i = 1:n
-    distMat(i,i) = 0;
-end
-
-for i = 1:m  % Symmetric case
-    node1 = edges(i,1);
-    node2 = edges(i,2);
-    distMat(node1, node2) = sqrt((xyCoord(node1,1)-xyCoord(node2,1))^2+(xyCoord(node1,2)-xyCoord(node2,2))^2);
-    distMat(node2, node1) = distMat(node1,node2);
-end
+% distMat = zeros(n,n) + BIGNUM;
+% for i = 1:n
+%     distMat(i,i) = 0;
+% end
+% 
+% for i = 1:m  % Symmetric case
+%     node1 = edges(i,1);
+%     node2 = edges(i,2);
+%     distMat(node1, node2) = sqrt((xyCoord(node1,1)-xyCoord(node2,1))^2+(xyCoord(node1,2)-xyCoord(node2,2))^2);
+%     distMat(node2, node1) = distMat(node1,node2);
+% end
+%load('SFdistMat.mat');  % Speed-up the experiment!
  
 % Prepare for the computation of the all-pair shortest paths between any two nodes (including target edges)
 % We use Bellman-Ford Algorithm
@@ -86,7 +87,7 @@ end
 spMat = zeros(n,n) + BIGNUM; % Initialize;
 index = sub2ind(size(spMat), 1:n, 1:n);
 spMat(index) = 0;
-spRteMat = zeros(n,n) + diag(1:n); % Matrix to record the shortest path route info
+spRteMat = sparse(sparse(n,n) + diag(1:n)); % Matrix to record the shortest path route info
 hasDoneSp = zeros(n,1); % Record whether we have computed the shortest paths from the source j. 1: has computed.
 % We only compute the shortest paths when needed.
 
@@ -118,7 +119,7 @@ innerPeriNodes = sortedIndex(rhoNodes > maxRho*RADIUS_PERCENT & rhoNodes <= maxR
 outerPeriNodes = sortedIndex(rhoNodes > maxRho*SECOND_RADIUS_PERCENT);
 
 % Generate the set of peripheral edges
-unifEdgeTargetList = generateEdgeSet(edges, periNodes);
+unifEdgeTargetList = generateEdgeSet(edges, periNodes, 0);
 unifNumEdgeTarget = size(unifEdgeTargetList,1);
 unifProbs = zeros(unifNumEdgeTarget, 1) + 1/unifNumEdgeTarget;
 
@@ -165,39 +166,44 @@ sdTruckNumNN = zeros(length(TRUCK_CAPACITY), length(N_TARGET_EDGE), N_RUN);
 %% Run N_RUN number of different realization of the targets to defense/attack and compute the average MAXIMUM TOTAL DISTANCE/SINGLE TRUCK DISTANCE BY EACH METHOD!
 for runtime = 1:N_RUN    
     %% Generate the potential list of edges to protect at every day!
-    % Current simple case: Uniform distribution
-    unifSumProb = zeros(unifNumEdgeTarget, 1);
-    unifSofar = 0;
-    for i = 1:unifNumEdgeTarget
-        unifSumProb(i,1) = unifProbs(i) + unifSofar;
-        unifSofar = unifSofar + unifProbs(i);
-    end
-
-    %% Generate the defenders' candidate target edges to defend for all the DAYS
-    % Current simple case: Uniform distribution
-    defenceVectorU = zeros(unifNumEdgeTarget,DAYS);
+%     % Current simple case: Uniform distribution
+%     unifSumProb = zeros(unifNumEdgeTarget, 1);
+%     unifSofar = 0;
+%     for i = 1:unifNumEdgeTarget
+%         unifSumProb(i,1) = unifProbs(i) + unifSofar;
+%         unifSofar = unifSofar + unifProbs(i);
+%     end
+% 
+%     %% Generate the defenders' candidate target edges to defend for all the DAYS
+%     % Current simple case: Uniform distribution
+%     defenceVectorU = zeros(unifNumEdgeTarget,DAYS);
+%     for i = 1:DAYS
+%         varProb = unifProbs;
+%         varSumProb = unifSumProb;
+%         varEdgeTargetIndexList = (1:unifNumEdgeTarget)';
+%         for j = 1:unifNumEdgeTarget
+%             randDefProb = rand(1);
+%             index = f_whichisit(randDefProb, varSumProb);
+%             defenceVectorU(j,i) = varEdgeTargetIndexList(index);
+%             % Update the probabilities and the sum of probabilities:
+%             % conditional probabilities!
+%             varProb(index) = [];
+%             varEdgeTargetIndexList(index) = [];
+%             varSumProb(index) = [];
+%             varProb = varProb/(sum(varProb)); % Re-normalization
+%             sofar = 0;
+%             for k = 1:length(varSumProb)
+%                 varSumProb(k,1) = varProb(k) + sofar;
+%                 sofar = sofar + varProb(k);
+%             end
+%         end
+%     end
+    %% This trick only works for the uniform distribution!
+    defenceVectorU = zeros(unifNumEdgeTarget, DAYS);
     for i = 1:DAYS
-        varProb = unifProbs;
-        varSumProb = unifSumProb;
-        varEdgeTargetIndexList = (1:unifNumEdgeTarget)';
-        for j = 1:unifNumEdgeTarget
-            randDefProb = rand(1);
-            index = f_whichisit(randDefProb, varSumProb);
-            defenceVectorU(j,i) = varEdgeTargetIndexList(index);
-            % Update the probabilities and the sum of probabilities:
-            % conditional probabilities!
-            varProb(index) = [];
-            varEdgeTargetIndexList(index) = [];
-            varSumProb(index) = [];
-            varProb = varProb/(sum(varProb)); % Re-normalization
-            sofar = 0;
-            for k = 1:length(varSumProb)
-                varSumProb(k,1) = varProb(k) + sofar;
-                sofar = sofar + varProb(k);
-            end
-        end
+        defenceVectorU(:,i) = randperm(unifNumEdgeTarget)';
     end
-
+    
     for nTargetEdge = 1:length(N_TARGET_EDGE)
         %% Prepare the set of edges to protect every day
         defenceVector = defenceVectorU(1:N_TARGET_EDGE(nTargetEdge), :);
@@ -230,15 +236,15 @@ for runtime = 1:N_RUN
                     % Intercircle                 
                     currLeft = 1;
                     todayEdgeTargetList = unifEdgeTargetList(defenceVector(:, day), :);
-                    innerEdgeTargetList = generateEdgeSet(todayEdgeTargetList, innerPeriNodes);
+                    innerEdgeTargetList = generateEdgeSet(todayEdgeTargetList, innerPeriNodes, 1);
                     while (currLeft < length(nodes))
                         currRight = length(nodes);
-                        examEdgeTargetList = generateEdgeSet(innerEdgeTargetList, sortedIndex(currLeft:currRight,:));                                  
-                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, examEdgeTargetList, spMat, spRteMat, hasDoneSp, 1, TRUCK_CAPACITY(cap), truckLoc, edges, IS_BACK, 0, 1);
+                        examEdgeTargetList = generateEdgeSet(innerEdgeTargetList, sortedIndex(currLeft:currRight,:), 0);                                  
+                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(nodes, examEdgeTargetList, spMat, spRteMat, hasDoneSp, 1, TRUCK_CAPACITY(cap), truckLoc, edges, IS_BACK, 0, 1);
                         while (~isempty(leftEdgeTargetList))
                             currRight = floor((currLeft + currRight)/2);
-                            examEdgeTargetList = generateEdgeSet(innerEdgeTargetList, sortedIndex(currLeft:currRight, :));
-                            [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, examEdgeTargetList, spMat, spRteMat, hasDoneSp, 1, TRUCK_CAPACITY(cap), truckLoc, edges, IS_BACK, 0, 1);
+                            examEdgeTargetList = generateEdgeSet(innerEdgeTargetList, sortedIndex(currLeft:currRight, :), 0);
+                            [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(nodes, examEdgeTargetList, spMat, spRteMat, hasDoneSp, 1, TRUCK_CAPACITY(cap), truckLoc, edges, IS_BACK, 0, 1);
                         end
                         currLeft = currRight;
                         truckNumWD(day) = truckNumWD(day) + 1;
@@ -247,15 +253,15 @@ for runtime = 1:N_RUN
                     % Outercircle                 
                     currLeft = 1;
                     todayEdgeTargetList = unifEdgeTargetList(defenceVector(:, day), :);
-                    outerEdgeTargetList = generateEdgeSet(todayEdgeTargetList, outerPeriNodes);
+                    outerEdgeTargetList = generateEdgeSet(todayEdgeTargetList, outerPeriNodes, 0);
                     while (currLeft < length(nodes))
                         currRight = length(nodes);
-                        examEdgeTargetList = generateEdgeSet(outerEdgeTargetList, sortedIndex(currLeft:currRight,:));                                  
-                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, examEdgeTargetList, spMat, spRteMat, hasDoneSp, 1, TRUCK_CAPACITY(cap), truckLoc, edges, IS_BACK, 0, 1);
+                        examEdgeTargetList = generateEdgeSet(outerEdgeTargetList, sortedIndex(currLeft:currRight,:), 0);                                  
+                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(nodes, examEdgeTargetList, spMat, spRteMat, hasDoneSp, 1, TRUCK_CAPACITY(cap), truckLoc, edges, IS_BACK, 0, 1);
                         while (~isempty(leftEdgeTargetList))
                             currRight = floor((currLeft + currRight)/2);
-                            examEdgeTargetList = generateEdgeSet(outerEdgeTargetList, sortedIndex(currLeft:currRight, :));
-                            [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, examEdgeTargetList, spMat, spRteMat, hasDoneSp, 1, TRUCK_CAPACITY(cap), truckLoc, edges, IS_BACK, 0, 1);
+                            examEdgeTargetList = generateEdgeSet(outerEdgeTargetList, sortedIndex(currLeft:currRight, :), 0);
+                            [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(nodes, examEdgeTargetList, spMat, spRteMat, hasDoneSp, 1, TRUCK_CAPACITY(cap), truckLoc, edges, IS_BACK, 0, 1);
                         end
                         currLeft = currRight;
                         truckNumWD(day) = truckNumWD(day) + 1;
@@ -325,17 +331,17 @@ for runtime = 1:N_RUN
                     low = 0;
                     % First find the high end of the search space
                     shareLoc = zeros(high, 1) + truckLoc;
-                    [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 1, 0);
+                    [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(nodes, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 1, 0);
                     while (~isempty(leftEdgeTargetList))
                         low = high;
                         high = high*2;
                         shareLoc = zeros(high, 1)+truckLoc;
-                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 1, 0);
+                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(nodes, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, high, TRUCK_CAPACITY(cap), shareLoc, edges, IS_BACK, 1, 0);
                     end
                         
                     while (high - low > 1)
                         med = floor((low + high)/2);
-                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(distMat, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, med, TRUCK_CAPACITY(cap), shareLoc(1:med,1), edges, IS_BACK, 1, 0);
+                        [leftEdgeTargetList, spMat, spRteMat, hasDoneSp] = wedgeCapNearestNeighbors(nodes, todayEdgeTargetList, spMat, spRteMat, hasDoneSp, med, TRUCK_CAPACITY(cap), shareLoc(1:med,1), edges, IS_BACK, 1, 0);
                         if (~isempty(leftEdgeTargetList))
                             low = med;
                         else
